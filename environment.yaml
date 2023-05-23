@@ -1,0 +1,17 @@
+#  conda env create --name ChIPseq_mapping --file environment.yaml 
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - snakemake=7.25.2
+  - pandas=2.0.1
+  - cutadapt=4.4
+  - fastqc=0.12.1
+  - bowtie2=2.5.1
+  - picard=3.0.0
+  - samtools=1.17
+  - deeptools=3.5.0
+  - ucsc-facount=377
+  - ucsc-bedgraphtobigwig=377
+  - conda-forge::ncurses=6.3
