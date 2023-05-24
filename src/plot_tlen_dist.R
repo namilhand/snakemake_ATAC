@@ -7,6 +7,8 @@ output <- args[2]
 #  output <- "qc/TLEN_dist/plot/sdfsdfsdf.txt"
 
 output_log10 <-  str_replace(output, ".pdf$", "_log10.pdf")
+output_png <-  str_replace(output, ".pdf$", ".png")
+output_png_log10 <-  str_replace(output, ".pdf$", "_log10.png")
 
 tlen_count <- read_delim(file=input, delim=" ", col_names=c("count", "tlen"))
 
@@ -24,5 +26,13 @@ plot(p.tlen_dist)
 dev.off()
 
 pdf(file=output_log10, width=2, height=2)
+plot(p.tlen_dist.log10)
+dev.off()
+
+png(file=output_png, width=2, height=2, units="in", res=300)
+plot(p.tlen_dist)
+dev.off()
+
+png(file=output_png_log10, width=2, height=2, units="in", res=300)
 plot(p.tlen_dist.log10)
 dev.off()

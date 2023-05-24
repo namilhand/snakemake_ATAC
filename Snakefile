@@ -25,7 +25,7 @@ rule all:
     input:
         expand("logs/fastqc/raw/{sample}",
                sample = sample),
-        expand("results/01_trimmed/{sample}_{read}.tr.fastq",
+        expand("results/01_trimmed/{sample}_{read}.tr.fastq.gz",
                sample = sample,
                read = [1,2]),
         expand("logs/fastqc/trimmed/{sample}",
@@ -33,36 +33,36 @@ rule all:
         expand("results/02_bowtie/{sample}_MappedOn_{refbase}.bam",
                 sample = sample,
                 refbase = refbase),
-        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.bam",
+        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.bam",
                sample = sample,
                refbase = refbase),
-        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
+        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam",
                sample = sample,
                refbase = refbase),
-        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai",
+        expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam.bai",
                sample = sample,
                refbase = refbase),
-        expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bw",
+        expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_1bp-resolution.bw",
                sample = sample,
                refbase = refbase),
-        expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bedgraph",
+        expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_1bp-resolution.bedgraph",
                sample = sample,
                refbase = refbase),
-        expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bedgraph",
+        expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_binSize{genomeBinName}.bedgraph",
                sample = sample,
                refbase = refbase,
                genomeBinName = genomeBinName),
-        expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bw",
+        expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_binSize{genomeBinName}.bw",
                sample = sample,
                refbase = refbase,
                genomeBinName = genomeBinName),
-        expand("qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt",
+        expand("qc/TLEN_dist/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist.txt",
                 sample = sample,
                 refbase = refbase),
-        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.pdf",
+        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist.pdf",
                 sample = sample,
                 refbase = refbase),
-        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist_log10.pdf",
+        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist_log10.pdf",
                 sample = sample,
                 refbase = refbase)
         # expand("mapped/both/tsv/{sample}_MappedOn_{refbase}_lowXM_both_sort_norm_binSize{genomeBinName}.tsv",
@@ -77,8 +77,8 @@ rule all:
 rule fastqc_raw:
     """Create fastqc report"""
     input:
-        read1 = "raw/{sample}_1.fastq",
-        read2 = "raw/{sample}_2.fastq"
+        read1 = "raw/{sample}_1.fastq.gz",
+        read2 = "raw/{sample}_2.fastq.gz"
     output:
         # html = "logs/fastqc/raw/{sample}_fastqc.html",
         # zip  = "logs/fastqc/raw/{sample}_fastqc.zip"
@@ -95,11 +95,11 @@ rule fastqc_raw:
 rule cutadapt:
     """Remove adapters"""
     input:
-        read1 = "raw/{sample}_1.fastq",
-        read2 = "raw/{sample}_2.fastq"
+        read1 = "raw/{sample}_1.fastq.gz",
+        read2 = "raw/{sample}_2.fastq.gz"
     output:
-        tr1 = "results/01_trimmed/{sample}_1.tr.fastq",
-        tr2 = "results/01_trimmed/{sample}_2.tr.fastq",
+        tr1 = "results/01_trimmed/{sample}_1.tr.fastq.gz",
+        tr2 = "results/01_trimmed/{sample}_2.tr.fastq.gz",
         qc    = "qc/cutadapt/{sample}_cutadapt.qc.txt"
     params:
         adapter=config["FILTER"]["cutadapt"]["adapter"], 
@@ -121,8 +121,8 @@ rule cutadapt:
 rule fastqc_trimmed:
     """Create fastqc report"""
     input:
-        tr1="results/01_trimmed/{sample}_1.tr.fastq",
-        tr2="results/01_trimmed/{sample}_2.tr.fastq"
+        tr1="results/01_trimmed/{sample}_1.tr.fastq.gz",
+        tr2="results/01_trimmed/{sample}_2.tr.fastq.gz"
     output:
         # html = "logs/fastqc/trimmed/{sample}_dedup_trimmed_fastqc.html",
         # zip  = "logs/fastqc/trimmed/{sample}_dedup_trimmed_fastqc.zip"
@@ -136,44 +136,42 @@ rule fastqc_trimmed:
         "mkdir -p {output}; fastqc -o {output} {params} {input.tr1} {input.tr2}"
 
 # Align to reference genome
-# Only primary reads with MAPQ > MAPQmaxi are retained
 rule bowtie2:
     """Map reads using bowtie2 and filter alignments using samtools"""
     input:
         # fastq = "data/dedup/trimmed/{sample}_dedup_trimmed.fastq.gz",
-        tr1="results/01_trimmed/{sample}_1.tr.fastq",
-        tr2="results/01_trimmed/{sample}_2.tr.fastq"
+        tr1="results/01_trimmed/{sample}_1.tr.fastq.gz",
+        tr2="results/01_trimmed/{sample}_2.tr.fastq.gz"
     output:
         "results/02_bowtie/{sample}_MappedOn_{refbase}.bam"
-    params:
-        MAPQmaxi = config["MAPPING"]["MAPQmaxi"]
     threads: config["THREADS"]
     log:
         "logs/bowtie2/{sample}_MappedOn_{refbase}.log"
     shell:
-        # -F 2308 excludes unmapped reads,
-        # as well as secondary and supplementary alignments
-        # Exclude alignments with MAPQ < config["MAPPING"]["MAPQmaxi"]
         "(bowtie2 --very-sensitive --no-mixed"
         " -X 2000"
         " --threads {threads}"
         " -x {reference} -1 {input.tr1} -2 {input.tr2}"
-        " | samtools view -bh -@ {threads} -F 2308 -q {params.MAPQmaxi} -o {output} - ) 2> {log}"
+        " | samtools view -bh -@ {threads} -o {output} - ) 2> {log}"
 
 # filtering alignments
 ## -f 2 to retain only properly mapped read pairs
 ## alignments to organellar DNA are excluded.
+# -F 2308 excludes unmapped reads,
+# as well as secondary and supplementary alignments
+# Exclude alignments with MAPQ < config["MAPPING"]["MAPQmaxi"]
 rule filter_bam:
     input:"results/02_bowtie/{sample}_MappedOn_{refbase}.bam"
-    output:"results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.bam"
+    output:"results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.bam"
     threads: config["THREADS"]
     params: 
         sortMemory = config["MAPPING"]["sortMemory"],
+        MAPQmaxi = config["MAPPING"]["MAPQmaxi"]
     log:
-        "logs/samtools/{sample}_MappedOn_{refbase}_nuclear_sort.log",
+        "logs/samtools/{sample}_MappedOn_{refbase}_filtered_sort.log",
     shell:
         r"""
-        (samtools view -h -f 2 -@ {threads} {input} | 
+        (samtools view -h -F 2308 -f 2 -q {params.MAPQmaxi} -@ {threads} {input} | 
         grep -v -e "ChrM" -e "ChrC" | 
         samtools view -u - |
         samtools sort -@ {threads} -m {params.sortMemory} -O bam -o {output} -) 2> {log}
@@ -181,10 +179,10 @@ rule filter_bam:
 
 rule markdup:
     output:
-        bam="results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
-        metric="logs/markdup/{sample}_MappedOn_{refbase}_nuclear_sort.md.txt"
-        # index="results/02_bowtie2/nuclear/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai"
-    input: "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.bam"
+        bam="results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam",
+        metric="logs/markdup/{sample}_MappedOn_{refbase}_filtered_sort.md.txt"
+        # index="results/02_bowtie2/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam.bai"
+    input: "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.bam"
     shell:
         r"""
         picard MarkDuplicates -I {input} \
@@ -195,12 +193,12 @@ rule markdup:
 rule postmapping:
     """bam.bai samtools flagstat idxstats"""
     input:
-        "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam"
+        "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam"
     output:
-        "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai"
+        "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam.bai"
     log:
-        flagstat   = "logs/samtools/stats/{sample}_MappedOn_{refbase}_nuclear_sort_md_flagstat.log",
-        idxstats   = "logs/samtools/stats/{sample}_MappedOn_{refbase}_nuclear_sort_md_idxstats.log"
+        flagstat   = "logs/samtools/stats/{sample}_MappedOn_{refbase}_filtered_sort_md_flagstat.log",
+        idxstats   = "logs/samtools/stats/{sample}_MappedOn_{refbase}_filtered_sort_md_idxstats.log"
     shell:
         """
         samtools index    {input}
@@ -210,17 +208,17 @@ rule postmapping:
 rule calc_coverage:
     """Calculate library-size-normalized coverage"""
     input:
-        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
-        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai"
+        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam",
+        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam.bai"
     output:
-        BW   = "results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bw",
-        BG   = "results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bedgraph"
+        BW   = "results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_1bp-resolution.bw",
+        BG   = "results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_1bp-resolution.bedgraph"
     params:
         normalizeUsing         = config["COVERAGE"]["normalizeUsing"],
         ignoreForNormalization = config["COVERAGE"]["ignoreForNormalization"],
         binSize                = config["COVERAGE"]["binSize"]
     log:
-        "logs/bamCoverage/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.log"
+        "logs/bamCoverage/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_1bp-resolution.log"
     threads: config["THREADS"]  
     shell:
         "(bamCoverage -b {input.BAM} -o {output.BW}"
@@ -238,17 +236,17 @@ rule calc_coverage:
 rule calc_coverage_genome:
     """Calculate library-size-normalized coverage in adjacent windows"""
     input:
-        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
-        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai"
+        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam",
+        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam.bai"
     output:
-        bg="results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bedgraph",
-        bw="results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bw"
+        bg="results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_binSize{genomeBinName}.bedgraph",
+        bw="results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_filtered_sort_md_norm_binSize{genomeBinName}.bw"
     params:
         normalizeUsing         = config["COVERAGE"]["normalizeUsing"],
         ignoreForNormalization = config["COVERAGE"]["ignoreForNormalization"],
         genomeBinSize          = config["COVERAGE"]["genomeBinSize"]
     log:
-        "logs/bamCoverage/{sample}_MappedOn_{refbase}_nuclear_both_sort_norm_binSize{genomeBinName}.log"
+        "logs/bamCoverage/{sample}_MappedOn_{refbase}_filtered_both_sort_norm_binSize{genomeBinName}.log"
     threads: config["THREADS"]  
     shell:
         "(bamCoverage -b {input.BAM} -o {output.bw}"
@@ -265,8 +263,8 @@ rule calc_coverage_genome:
         " --binSize {params.genomeBinSize} -p {threads}) 2> {log}"
 rule tlen_dist:
     """The distribution of ATAC-seq fragment"""
-    output: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt"
-    input: "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam"
+    output: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist.txt"
+    input: "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_filtered_sort.md.bam"
     shell:
         "samtools view {input} | "
         "awk '$9>0' | " # output reads with positive fragment length, i.e. left-most reads
@@ -277,12 +275,12 @@ rule tlen_dist:
         " > {output}"
 rule tlen_dist_plot:
     output: 
-        plot="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.pdf",
-        plot_log10="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist_log10.pdf"
-    input: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt"
+        plot="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist.pdf",
+        plot_log10="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist_log10.pdf"
+    input: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_filtered_sort.md.tlen_dist.txt"
     shell:
         r"""
-        Rscript src/plot_tlen_dist.R {input} {output}
+        Rscript src/plot_tlen_dist.R {input} {output.plot}
         """
     
 
