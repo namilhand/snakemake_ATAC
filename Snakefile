@@ -25,7 +25,7 @@ rule all:
     input:
         expand("logs/fastqc/raw/{sample}",
                sample = sample),
-        expand("results/01_trimmed/{sample}_{read}.tr.fastq.gz",
+        expand("results/01_trimmed/{sample}_{read}.tr.fastq",
                sample = sample,
                read = [1,2]),
         expand("logs/fastqc/trimmed/{sample}",
@@ -55,7 +55,16 @@ rule all:
         expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bw",
                sample = sample,
                refbase = refbase,
-               genomeBinName = genomeBinName)
+               genomeBinName = genomeBinName),
+        expand("qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt",
+                sample = sample,
+                refbase = refbase),
+        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.pdf",
+                sample = sample,
+                refbase = refbase),
+        expand("qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist_log10.pdf",
+                sample = sample,
+                refbase = refbase)
         # expand("mapped/both/tsv/{sample}_MappedOn_{refbase}_lowXM_both_sort_norm_binSize{genomeBinName}.tsv",
         #        sample = sample,
         #        refbase = refbase,
@@ -68,8 +77,8 @@ rule all:
 rule fastqc_raw:
     """Create fastqc report"""
     input:
-        read1 = "raw/{sample}_1.fastq.gz",
-        read2 = "raw/{sample}_2.fastq.gz"
+        read1 = "raw/{sample}_1.fastq",
+        read2 = "raw/{sample}_2.fastq"
     output:
         # html = "logs/fastqc/raw/{sample}_fastqc.html",
         # zip  = "logs/fastqc/raw/{sample}_fastqc.zip"
@@ -86,11 +95,11 @@ rule fastqc_raw:
 rule cutadapt:
     """Remove adapters"""
     input:
-        read1 = "raw/{sample}_1.fastq.gz",
-        read2 = "raw/{sample}_2.fastq.gz"
+        read1 = "raw/{sample}_1.fastq",
+        read2 = "raw/{sample}_2.fastq"
     output:
-        tr1 = "results/01_trimmed/{sample}_1.tr.fastq.gz",
-        tr2 = "results/01_trimmed/{sample}_2.tr.fastq.gz",
+        tr1 = "results/01_trimmed/{sample}_1.tr.fastq",
+        tr2 = "results/01_trimmed/{sample}_2.tr.fastq",
         qc    = "qc/cutadapt/{sample}_cutadapt.qc.txt"
     params:
         adapter=config["FILTER"]["cutadapt"]["adapter"], 
@@ -112,8 +121,8 @@ rule cutadapt:
 rule fastqc_trimmed:
     """Create fastqc report"""
     input:
-        tr1="results/01_trimmed/{sample}_1.tr.fastq.gz",
-        tr2="results/01_trimmed/{sample}_2.tr.fastq.gz"
+        tr1="results/01_trimmed/{sample}_1.tr.fastq",
+        tr2="results/01_trimmed/{sample}_2.tr.fastq"
     output:
         # html = "logs/fastqc/trimmed/{sample}_dedup_trimmed_fastqc.html",
         # zip  = "logs/fastqc/trimmed/{sample}_dedup_trimmed_fastqc.zip"
@@ -132,8 +141,8 @@ rule bowtie2:
     """Map reads using bowtie2 and filter alignments using samtools"""
     input:
         # fastq = "data/dedup/trimmed/{sample}_dedup_trimmed.fastq.gz",
-        tr1="results/01_trimmed/{sample}_1.tr.fastq.gz",
-        tr2="results/01_trimmed/{sample}_2.tr.fastq.gz"
+        tr1="results/01_trimmed/{sample}_1.tr.fastq",
+        tr2="results/01_trimmed/{sample}_2.tr.fastq"
     output:
         "results/02_bowtie/{sample}_MappedOn_{refbase}.bam"
     params:
@@ -254,6 +263,30 @@ rule calc_coverage_genome:
         " --exactScaling"
         " --extendReads"
         " --binSize {params.genomeBinSize} -p {threads}) 2> {log}"
+rule tlen_dist:
+    """The distribution of ATAC-seq fragment"""
+    output: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt"
+    input: "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam"
+    shell:
+        "samtools view {input} | "
+        "awk '$9>0' | " # output reads with positive fragment length, i.e. left-most reads
+        "cut -f 9 | " #get the fragment length
+        "sort | uniq -c | " #count the occurrence of each fragment length
+        "sort -b -k2,2n | " #sort based on fragment length
+        "sed -e 's/^[ \\t]*//'" #remove leading blank of the standard output
+        " > {output}"
+rule tlen_dist_plot:
+    output: 
+        plot="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.pdf",
+        plot_log10="qc/TLEN_dist/plot/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist_log10.pdf"
+    input: "qc/TLEN_dist/{sample}_MappedOn_{refbase}_nuclear_sort.md.tlen_dist.txt"
+    shell:
+        r"""
+        Rscript src/plot_tlen_dist.R {input} {output}
+        """
+    
+
+
 
 # Use R script genomeBin_bedgraphToTSV.R to convert *{genomeBinName}.bedgraph files into TSV files
 # These TSV files can be imported into R for calculating and plotting log2(ChIP/control) chromosome-scale profiles

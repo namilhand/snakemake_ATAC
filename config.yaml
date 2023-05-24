@@ -1,13 +1,7 @@
 SAMPLES: [
-          "Col-0_bud-1",
-          "Col-0_bud-2",
-          "Col-0_bud-3",
-          "arp6_bud-1",
-          "arp6_bud-2",
-          "arp6_bud-3",
-          "pie1_bud-1",
-          "pie1_bud-2",
-          "pie1_bud-3"
+          "SRR12362020",
+          "SRR12362021",
+          "SRR12362022",
          ]
 THREADS: 35
 MEMORY: "250g"
