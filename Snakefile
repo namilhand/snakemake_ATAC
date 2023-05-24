@@ -42,12 +42,12 @@ rule all:
         expand("results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai",
                sample = sample,
                refbase = refbase),
-        # expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_norm.md.bw",
-        #        sample = sample,
-        #        refbase = refbase),
-        # expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_lowXM_sort_norm.md.bedgraph",
-        #        sample = sample,
-        #        refbase = refbase),
+        expand("results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bw",
+               sample = sample,
+               refbase = refbase),
+        expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bedgraph",
+               sample = sample,
+               refbase = refbase),
         expand("results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_binSize{genomeBinName}.bedgraph",
                sample = sample,
                refbase = refbase,
@@ -151,8 +151,10 @@ rule bowtie2:
         " -x {reference} -1 {input.tr1} -2 {input.tr2}"
         " | samtools view -bh -@ {threads} -F 2308 -q {params.MAPQmaxi} -o {output} - ) 2> {log}"
 
-# remove organellar DNA and sort
-rule remove_organelle:
+# filtering alignments
+## -f 2 to retain only properly mapped read pairs
+## alignments to organellar DNA are excluded.
+rule filter_bam:
     input:"results/02_bowtie/{sample}_MappedOn_{refbase}.bam"
     output:"results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.bam"
     threads: config["THREADS"]
@@ -162,29 +164,12 @@ rule remove_organelle:
         "logs/samtools/{sample}_MappedOn_{refbase}_nuclear_sort.log",
     shell:
         r"""
-        (samtools view -h -@ {threads} {input} | 
+        (samtools view -h -f 2 -@ {threads} {input} | 
         grep -v -e "ChrM" -e "ChrC" | 
         samtools view -u - |
         samtools sort -@ {threads} -m {params.sortMemory} -O bam -o {output} -) 2> {log}
         """
 
-
-# Filter alignments for mismatches and extract unique alignments
-# rule samtools:
-#     input:"results/02_bowtie/{sample}_MappedOn_{refbase}.bam"
-#     output:
-#         protected("results/02_bowtie/lowXM/{sample}_MappedOn_{refbase}_lowXM_sort.bam")
-#     params:
-#         sortMemory = config["MAPPING"]["sortMemory"],
-#     threads: config["THREADS"]
-#     log:
-#         "logs/samtools/{sample}_MappedOn_{refbase}_lowXM_sort.log",
-#     shell:
-#         "(samtools view -h {input} " 
-#         "| grep -e '^@' -e 'XM:i:[012][^0-9]' "
-#         "| samtools view -u - "
-#         "| samtools sort -@ {threads} -m {params.sortMemory} -o {output} -) 2> {log};"
-        # "| samtools rmdup -s - {output.both}) 2> {log.both}; "
 rule markdup:
     output:
         bam="results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
@@ -216,31 +201,30 @@ rule postmapping:
 rule calc_coverage:
     """Calculate library-size-normalized coverage"""
     input:
-        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_lowXM_sort.md.bam",
-        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_lowXM_sort.md.bam.bai"
+        BAM   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam",
+        BAMidx   = "results/02_bowtie/filtered/{sample}_MappedOn_{refbase}_nuclear_sort.md.bam.bai"
     output:
-        BW   = "results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_lowXM_sort_norm.md.bw",
-        BG   = "results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_lowXM_sort_norm.md.bedgraph"
+        BW   = "results/03_bamCoverage/bw/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bw",
+        BG   = "results/03_bamCoverage/bg/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.bedgraph"
     params:
         normalizeUsing         = config["COVERAGE"]["normalizeUsing"],
         ignoreForNormalization = config["COVERAGE"]["ignoreForNormalization"],
-        extendReads            = config["COVERAGE"]["extendReads"],
         binSize                = config["COVERAGE"]["binSize"]
     log:
-        "logs/bamCoverage/{sample}_MappedOn_{refbase}_lowXM_both_sort_md_norm.log"
+        "logs/bamCoverage/{sample}_MappedOn_{refbase}_nuclear_sort_md_norm_1bp-resolution.log"
     threads: config["THREADS"]  
     shell:
         "(bamCoverage -b {input.BAM} -o {output.BW}"
         " --normalizeUsing {params.normalizeUsing}"
         " --ignoreForNormalization {params.ignoreForNormalization}"
         " --exactScaling"
-        " --extendReads {params.extendReads}"
+        " --extendReads"
         " --binSize {params.binSize} -p {threads}; "
         "bamCoverage -b {input.BAM} -o {output.BG} -of bedgraph"
         " --normalizeUsing {params.normalizeUsing}"
         " --ignoreForNormalization {params.ignoreForNormalization}"
         " --exactScaling"
-        " --extendReads {params.extendReads}"
+        " --extendReads"
         " --binSize {params.binSize} -p {threads}) 2> {log}"
 rule calc_coverage_genome:
     """Calculate library-size-normalized coverage in adjacent windows"""
@@ -253,7 +237,6 @@ rule calc_coverage_genome:
     params:
         normalizeUsing         = config["COVERAGE"]["normalizeUsing"],
         ignoreForNormalization = config["COVERAGE"]["ignoreForNormalization"],
-        extendReads            = config["COVERAGE"]["extendReads"],
         genomeBinSize          = config["COVERAGE"]["genomeBinSize"]
     log:
         "logs/bamCoverage/{sample}_MappedOn_{refbase}_nuclear_both_sort_norm_binSize{genomeBinName}.log"
@@ -262,14 +245,14 @@ rule calc_coverage_genome:
         "(bamCoverage -b {input.BAM} -o {output.bw}"
         " --normalizeUsing {params.normalizeUsing}"
         " --ignoreForNormalization {params.ignoreForNormalization}"
-        # " --exactScaling"
-        # " --extendReads {params.extendReads}"
+        " --exactScaling"
+        " --extendReads"
         " --binSize {params.genomeBinSize} -p {threads};"
         "bamCoverage -b {input.BAM} -o {output.bg} -of bedgraph"
         " --normalizeUsing {params.normalizeUsing}"
         " --ignoreForNormalization {params.ignoreForNormalization}"
-        # " --exactScaling"
-        # " --extendReads {params.extendReads}"
+        " --exactScaling"
+        " --extendReads"
         " --binSize {params.genomeBinSize} -p {threads}) 2> {log}"
 
 # Use R script genomeBin_bedgraphToTSV.R to convert *{genomeBinName}.bedgraph files into TSV files

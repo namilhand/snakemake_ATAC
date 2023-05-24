@@ -26,8 +26,7 @@ MAPPING:
       sortMemory: "5G"
 COVERAGE:
       normalizeUsing: "BPM"
-      ignoreForNormalization: "mitochondria chloroplast" # Reference genome-specific parameter
-      extendReads: 150
+      ignoreForNormalization: "ChrC ChrM" # Reference genome-specific parameter
       binSize: 1
       genomeBinSize: 10000
       genomeBinName: "10kb"
